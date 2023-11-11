@@ -19,8 +19,9 @@ def parse_obj(filename):
             elif line.startswith('vt '):
                 uvs.append([float(x) for x in line[3:].split()])
             elif line.startswith('f '):
-                indices = [x.split('/') for x in line.split()[1:]]
-                faces.append(indices)
+                triangle = [x.split('/') for x in line.split()[1:]]
+                triangle = [[int(x) for x in vertex] for vertex in triangle]
+                faces.append(triangle)
 
     data = {}
     data['vertices']    = np.array(vertices)
@@ -92,7 +93,7 @@ def mesh_to_data(mesh):
 
     return data
 
-def SIMPLIFY_OBJ(INPUT_OBJ, OUTPUT_OBJ, SIMPLIFY):
+def simplify_obj(INPUT_OBJ, OUTPUT_OBJ, SIMPLIFY):
     data = parse_obj(INPUT_OBJ)
 
     # Open3D decimation can't deal with UV info, so let's save those info as vertices colors (it's a trick :P)
@@ -109,12 +110,51 @@ def SIMPLIFY_OBJ(INPUT_OBJ, OUTPUT_OBJ, SIMPLIFY):
     colors_to_uvs(data)
     save_obj(OUTPUT_OBJ, data)
 
-SIMPLIFY = 10
-SEGMENT_ID = '20230505141722'
+# SIMPLIFY = 10
+# SEGMENT_ID = '20230510153006'
 
-INPUT_OBJ = f'{SEGMENT_ID}.obj'
-OUTPUT_OBJ = f'{SEGMENT_ID}_s{SIMPLIFY}.obj'
+# INPUT_OBJ = f'{SEGMENT_ID}.obj'
+# OUTPUT_OBJ = f'{SEGMENT_ID}_s{SIMPLIFY}.obj'
 
-SIMPLIFY_OBJ(INPUT_OBJ, OUTPUT_OBJ, SIMPLIFY)
+# simplify_obj(INPUT_OBJ, OUTPUT_OBJ, SIMPLIFY)
+
+
+# x_crop = 2779
+# filename = '20230503225234.obj'
+# x_crop = 3884
+# filename = '20230510153006_s10.obj'
+
+# data = parse_obj(filename)
+
+# mask = np.sum(data['vertices'][data['faces'][:,:,0] - 1, 0] < x_crop, axis=1) >= 2
+
+# data['faces'] = data['faces'][mask]
+
+# save_obj('ok.obj', data)
+
+mesh = o3d.io.read_triangle_mesh('ok.obj')
+data = mesh_to_data(mesh)
+
+triangle_clusters, cluster_n_triangles, _ = mesh.cluster_connected_triangles()
+triangle_clusters = np.asarray(triangle_clusters)
+cluster_n_triangles = np.asarray(cluster_n_triangles)
+# print(np.max(triangle_clusters))
+
+cluster_data = data.copy()
+cluster_data['faces'] = data['faces'][triangle_clusters == 0]
+save_obj('ok-0.obj', cluster_data)
+
+cluster_data = data.copy()
+cluster_data['faces'] = data['faces'][triangle_clusters == 1]
+save_obj('ok-1.obj', cluster_data)
+
+cluster_data = data.copy()
+cluster_data['faces'] = data['faces'][triangle_clusters == 2]
+save_obj('ok-2.obj', cluster_data)
+
+cluster_data = data.copy()
+cluster_data['faces'] = data['faces'][triangle_clusters == 3]
+save_obj('ok-3.obj', cluster_data)
+
 
 
