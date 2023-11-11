@@ -49,17 +49,17 @@ def save_obj(filename, data):
             color = colors[i] if len(colors) else ''
 
             f.write('v ')
-            f.write(f"{' '.join(str(x) for x in vertex)}")
+            f.write(f"{' '.join(str(round(x, 2)) for x in vertex)}")
             f.write(' ')
-            f.write(f"{' '.join(str(x) for x in color)}")
+            f.write(f"{' '.join(str(round(x, 6)) for x in color)}")
             f.write('\n')
 
             f.write('vn ')
-            f.write(f"{' '.join(str(x) for x in normal)}")
+            f.write(f"{' '.join(str(round(x, 6)) for x in normal)}")
             f.write('\n')
 
         for uv in uvs:
-            f.write(f"vt {' '.join(str(x) for x in uv)}\n")
+            f.write(f"vt {' '.join(str(round(x, 6)) for x in uv)}\n")
 
         for face in faces:
             indices = ' '.join(['/'.join(map(str, vertex)) for vertex in face])
@@ -73,6 +73,48 @@ def uvs_to_colors(data):
 
     data['colors'] = np.hstack((rg, b))
 
-# data = parse_obj('20230503225234.obj')
-# uvs_to_colors(data)
-# save_obj('20230503225234-colors.obj', data)
+def colors_to_uvs(data):
+    colors = data.get('colors', np.array([]))
+
+    data['uvs']    = colors[:, :2]
+    data['colors'] = np.array([])
+
+def mesh_to_data(mesh):
+    data = {}
+    data['vertices']    = np.asarray(mesh.vertices)
+    data['normals']     = np.asarray(mesh.vertex_normals)
+    data['colors']      = np.asarray(mesh.vertex_colors)
+
+    # FACE_NUM * 3     : [[0, 2, 5], ...]
+    f = np.array(mesh.triangles)
+    # FACE_NUM * 3 * 3 : [[[1, 1, 1], [3, 3, 3], [6, 6, 6]], ...]
+    data['faces']  = (f + 1)[:, :, np.newaxis] * np.ones_like(f)[:, np.newaxis, :]
+
+    return data
+
+def SIMPLIFY_OBJ(INPUT_OBJ, OUTPUT_OBJ, SIMPLIFY):
+    data = parse_obj(INPUT_OBJ)
+
+    # Open3D decimation can't deal with UV info, so let's save those info as vertices colors (it's a trick :P)
+    uvs_to_colors(data)
+    save_obj(OUTPUT_OBJ, data)
+
+    # mesh decimation
+    mesh = o3d.io.read_triangle_mesh(OUTPUT_OBJ)
+    TRI_NUM = len(mesh.triangles) // SIMPLIFY
+    mesh_smp = mesh.simplify_quadric_decimation(target_number_of_triangles=TRI_NUM)
+
+    # Once Open3D finishes decimation, restore those uv info from vertices colors
+    data = mesh_to_data(mesh_smp)
+    colors_to_uvs(data)
+    save_obj(OUTPUT_OBJ, data)
+
+SIMPLIFY = 10
+SEGMENT_ID = '20230505141722'
+
+INPUT_OBJ = f'{SEGMENT_ID}.obj'
+OUTPUT_OBJ = f'{SEGMENT_ID}_s{SIMPLIFY}.obj'
+
+SIMPLIFY_OBJ(INPUT_OBJ, OUTPUT_OBJ, SIMPLIFY)
+
+
