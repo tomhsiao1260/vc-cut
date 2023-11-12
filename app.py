@@ -81,6 +81,7 @@ def colors_to_uvs(data):
     data['colors'] = np.array([])
 
 def mesh_to_data(mesh):
+    # uvs is missed
     data = {}
     data['vertices']    = np.asarray(mesh.vertices)
     data['normals']     = np.asarray(mesh.vertex_normals)
@@ -110,6 +111,21 @@ def simplify_obj(INPUT_OBJ, OUTPUT_OBJ, SIMPLIFY):
     colors_to_uvs(data)
     save_obj(OUTPUT_OBJ, data)
 
+def re_index(data):
+    data['faces'] -= 1
+    selected_vertices = np.unique(data['faces'][:,:,0])
+
+    # only leave the vertices used to form the faces
+    data['vertices'] = data['vertices'][selected_vertices]
+    data['normals']  = data['normals'][selected_vertices]
+    data['uvs']      = data['uvs'][selected_vertices]
+    data['colors']   = data['colors'][selected_vertices]
+
+    # update face index
+    vertex_mapping = { old_index: new_index for new_index, old_index in enumerate(selected_vertices) }
+    data['faces'] = np.vectorize(lambda x: vertex_mapping.get(x, x))(data['faces'])
+    data['faces'] += 1
+
 # SIMPLIFY = 10
 # SEGMENT_ID = '20230510153006'
 
@@ -132,8 +148,8 @@ def simplify_obj(INPUT_OBJ, OUTPUT_OBJ, SIMPLIFY):
 
 # save_obj('ok.obj', data)
 
+data = parse_obj('ok.obj')
 mesh = o3d.io.read_triangle_mesh('ok.obj')
-data = mesh_to_data(mesh)
 
 triangle_clusters, cluster_n_triangles, _ = mesh.cluster_connected_triangles()
 triangle_clusters = np.asarray(triangle_clusters)
@@ -142,19 +158,24 @@ cluster_n_triangles = np.asarray(cluster_n_triangles)
 
 cluster_data = data.copy()
 cluster_data['faces'] = data['faces'][triangle_clusters == 0]
+re_index(cluster_data)
 save_obj('ok-0.obj', cluster_data)
 
 cluster_data = data.copy()
 cluster_data['faces'] = data['faces'][triangle_clusters == 1]
+re_index(cluster_data)
 save_obj('ok-1.obj', cluster_data)
 
 cluster_data = data.copy()
 cluster_data['faces'] = data['faces'][triangle_clusters == 2]
+re_index(cluster_data)
 save_obj('ok-2.obj', cluster_data)
 
 cluster_data = data.copy()
 cluster_data['faces'] = data['faces'][triangle_clusters == 3]
+re_index(cluster_data)
 save_obj('ok-3.obj', cluster_data)
+
 
 
 
