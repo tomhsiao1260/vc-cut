@@ -94,22 +94,22 @@ def mesh_to_data(mesh):
 
     return data
 
-def simplify_obj(INPUT_OBJ, OUTPUT_OBJ, SIMPLIFY):
-    data = parse_obj(INPUT_OBJ)
+def simplify_obj(OBJ_INPUT, OBJ_SIMPLIFY, SIMPLIFY):
+    data = parse_obj(OBJ_INPUT)
 
     # Open3D decimation can't deal with UV info, so let's save those info as vertices colors (it's a trick :P)
     uvs_to_colors(data)
-    save_obj(OUTPUT_OBJ, data)
+    save_obj(OBJ_SIMPLIFY, data)
 
     # mesh decimation
-    mesh = o3d.io.read_triangle_mesh(OUTPUT_OBJ)
+    mesh = o3d.io.read_triangle_mesh(OBJ_SIMPLIFY)
     TRI_NUM = len(mesh.triangles) // SIMPLIFY
     mesh_smp = mesh.simplify_quadric_decimation(target_number_of_triangles=TRI_NUM)
 
     # Once Open3D finishes decimation, restore those uv info from vertices colors
     data = mesh_to_data(mesh_smp)
     colors_to_uvs(data)
-    save_obj(OUTPUT_OBJ, data)
+    save_obj(OBJ_SIMPLIFY, data)
 
 def re_index(data):
     data['faces'] -= 1
@@ -126,55 +126,63 @@ def re_index(data):
     data['faces'] = np.vectorize(lambda x: vertex_mapping.get(x, x))(data['faces'])
     data['faces'] += 1
 
-# SIMPLIFY = 10
-# SEGMENT_ID = '20230510153006'
+def crop_obj(OBJ_SIMPLIFY, X_MIDDLE, OBJ_SIMPLIFY_LEFT, OBJ_SIMPLIFY_RIGHT):
+    data = parse_obj(OBJ_SIMPLIFY)
 
-# INPUT_OBJ = f'{SEGMENT_ID}.obj'
-# OUTPUT_OBJ = f'{SEGMENT_ID}_s{SIMPLIFY}.obj'
+    left_data = data.copy()
+    right_data = data.copy()
 
-# simplify_obj(INPUT_OBJ, OUTPUT_OBJ, SIMPLIFY)
+    mask = np.sum(data['vertices'][data['faces'][:,:,0] - 1, 0] < X_MIDDLE, axis=1) >= 2
 
+    left_data['faces'] = data['faces'][mask]
+    right_data['faces'] = data['faces'][~mask]
 
-# x_crop = 2779
-# filename = '20230503225234.obj'
-# x_crop = 3884
-# filename = '20230510153006_s10.obj'
+    save_obj(OBJ_SIMPLIFY_LEFT, left_data)
+    save_obj(OBJ_SIMPLIFY_RIGHT, right_data)
 
-# data = parse_obj(filename)
+def cluster_obj(filename, SEGMENT_ID, SIMPLIFY, REVERSE, LEFT):
+    data = parse_obj(filename)
+    mesh = o3d.io.read_triangle_mesh(filename)
 
-# mask = np.sum(data['vertices'][data['faces'][:,:,0] - 1, 0] < x_crop, axis=1) >= 2
+    triangle_clusters, cluster_n_triangles, _ = mesh.cluster_connected_triangles()
+    triangle_clusters = np.asarray(triangle_clusters)
+    cluster_n_triangles = np.asarray(cluster_n_triangles)
 
-# data['faces'] = data['faces'][mask]
+    cluster_data_list = []
+    cluster_uv_list = []
+    for i in range(len(cluster_n_triangles)):
+        cluster_data = data.copy()
+        cluster_data['faces'] = data['faces'][triangle_clusters == i]
+        re_index(cluster_data)
 
-# save_obj('ok.obj', data)
+        cluster_data_list.append(cluster_data)
+        cluster_uv_list.append(np.mean(cluster_data['uvs'], axis=0))
 
-data = parse_obj('ok.obj')
-mesh = o3d.io.read_triangle_mesh('ok.obj')
+    sorted_id = np.argsort(np.array(cluster_uv_list)[:, 0])
+    sorted_id = sorted_id if not REVERSE else np.max(sorted_id) - sorted_id
 
-triangle_clusters, cluster_n_triangles, _ = mesh.cluster_connected_triangles()
-triangle_clusters = np.asarray(triangle_clusters)
-cluster_n_triangles = np.asarray(cluster_n_triangles)
-# print(np.max(triangle_clusters))
+    for i, cluster_data in enumerate(cluster_data_list):
+        side = 'l' if LEFT else 'r'
+        filename = f'{SEGMENT_ID}__s{SIMPLIFY}_{side}{sorted_id[i]}.obj'
+        save_obj(filename, cluster_data)
 
-cluster_data = data.copy()
-cluster_data['faces'] = data['faces'][triangle_clusters == 0]
-re_index(cluster_data)
-save_obj('ok-0.obj', cluster_data)
+REVERSE = False
+SIMPLIFY = 10
+X_MIDDLE = 3884
+SEGMENT_ID = '20230510153006'
 
-cluster_data = data.copy()
-cluster_data['faces'] = data['faces'][triangle_clusters == 1]
-re_index(cluster_data)
-save_obj('ok-1.obj', cluster_data)
+OBJ_INPUT = f'{SEGMENT_ID}.obj'
+OBJ_SIMPLIFY = f'{SEGMENT_ID}_s{SIMPLIFY}.obj'
+OBJ_SIMPLIFY_LEFT = f'{SEGMENT_ID}_s{SIMPLIFY}_l.obj'
+OBJ_SIMPLIFY_RIGHT = f'{SEGMENT_ID}_s{SIMPLIFY}_r.obj'
 
-cluster_data = data.copy()
-cluster_data['faces'] = data['faces'][triangle_clusters == 2]
-re_index(cluster_data)
-save_obj('ok-2.obj', cluster_data)
+simplify_obj(OBJ_INPUT, OBJ_SIMPLIFY, SIMPLIFY)
 
-cluster_data = data.copy()
-cluster_data['faces'] = data['faces'][triangle_clusters == 3]
-re_index(cluster_data)
-save_obj('ok-3.obj', cluster_data)
+crop_obj(OBJ_SIMPLIFY, X_MIDDLE, OBJ_SIMPLIFY_LEFT, OBJ_SIMPLIFY_RIGHT)
+
+cluster_obj(OBJ_SIMPLIFY_LEFT, SEGMENT_ID, SIMPLIFY, REVERSE, True)
+cluster_obj(OBJ_SIMPLIFY_RIGHT, SEGMENT_ID, SIMPLIFY, REVERSE, False)
+
 
 
 
