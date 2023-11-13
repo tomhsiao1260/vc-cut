@@ -129,13 +129,24 @@ def re_index(data):
 def crop_obj(OBJ_SIMPLIFY, X_MIDDLE, OBJ_SIMPLIFY_LEFT, OBJ_SIMPLIFY_RIGHT):
     data = parse_obj(OBJ_SIMPLIFY)
 
+    # number of vertices of each triangle located in the left side (0~3)
+    tri_left_num = np.sum(data['vertices'][data['faces'][:,:,0] - 1, 0] < X_MIDDLE, axis=1)
+
+    # make vertices align with the cutting edge (left & right triangle)
+    right_edge_faces = data['faces'][tri_left_num == 1][:,:,0] - 1
+    mask = data['vertices'][right_edge_faces, 0] < X_MIDDLE
+    data['vertices'][right_edge_faces[mask], 0] = X_MIDDLE
+
+    left_edge_faces = data['faces'][tri_left_num == 2][:,:,0] - 1
+    mask = data['vertices'][left_edge_faces, 0] > X_MIDDLE
+    data['vertices'][left_edge_faces[mask], 0] = X_MIDDLE
+
+    # receive left & right surface
     left_data = data.copy()
     right_data = data.copy()
 
-    mask = np.sum(data['vertices'][data['faces'][:,:,0] - 1, 0] < X_MIDDLE, axis=1) >= 2
-
-    left_data['faces'] = data['faces'][mask]
-    right_data['faces'] = data['faces'][~mask]
+    left_data['faces'] = data['faces'][tri_left_num >= 2]
+    right_data['faces'] = data['faces'][tri_left_num < 2]
 
     save_obj(OBJ_SIMPLIFY_LEFT, left_data)
     save_obj(OBJ_SIMPLIFY_RIGHT, right_data)
