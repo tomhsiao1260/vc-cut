@@ -126,20 +126,23 @@ def re_index(data):
     data['faces'] = np.vectorize(lambda x: vertex_mapping.get(x, x))(data['faces'])
     data['faces'] += 1
 
-def crop_obj(OBJ_SIMPLIFY, X_MIDDLE, OBJ_SIMPLIFY_LEFT, OBJ_SIMPLIFY_RIGHT):
+def cut_obj(OBJ_SIMPLIFY, X_CENTER, OBJ_SIMPLIFY_LEFT, OBJ_SIMPLIFY_RIGHT):
     data = parse_obj(OBJ_SIMPLIFY)
 
+    tri_z_values = data['vertices'][data['faces'][:,:,0] - 1, 2]
+    centers = np.interp(tri_z_values, X_CENTER[:, 2], X_CENTER[:, 0])
+
     # number of vertices of each triangle located in the left side (0~3)
-    tri_left_num = np.sum(data['vertices'][data['faces'][:,:,0] - 1, 0] < X_MIDDLE, axis=1)
+    tri_left_num = np.sum(data['vertices'][data['faces'][:,:,0] - 1, 0] < centers, axis=1)
 
     # make vertices align with the cutting edge (left & right triangle)
     right_edge_faces = data['faces'][tri_left_num == 1][:,:,0] - 1
-    mask = data['vertices'][right_edge_faces, 0] < X_MIDDLE
-    data['vertices'][right_edge_faces[mask], 0] = X_MIDDLE
+    mask = data['vertices'][right_edge_faces, 0] < centers[tri_left_num == 1]
+    data['vertices'][right_edge_faces[mask], 0] = centers[tri_left_num == 1, np.argmax(mask, axis=1)]
 
     left_edge_faces = data['faces'][tri_left_num == 2][:,:,0] - 1
-    mask = data['vertices'][left_edge_faces, 0] > X_MIDDLE
-    data['vertices'][left_edge_faces[mask], 0] = X_MIDDLE
+    mask = data['vertices'][left_edge_faces, 0] > centers[tri_left_num == 2]
+    data['vertices'][left_edge_faces[mask], 0] = centers[tri_left_num == 2, np.argmax(mask, axis=1)]
 
     # receive left & right surface
     left_data = data.copy()
@@ -174,26 +177,32 @@ def cluster_obj(filename, SEGMENT_ID, SIMPLIFY, REVERSE, LEFT):
 
     for i, cluster_data in enumerate(cluster_data_list):
         side = 'l' if LEFT else 'r'
-        filename = f'{SEGMENT_ID}__s{SIMPLIFY}_{side}{sorted_id[i]}.obj'
+        filename = f'{SEGMENT_ID}_s{SIMPLIFY}_{side}{sorted_id[i]}.obj'
         save_obj(filename, cluster_data)
 
-REVERSE = False
 SIMPLIFY = 10
-X_MIDDLE = 3884
+REVERSE = False
 SEGMENT_ID = '20230510153006'
+CENTER_INPUT = 'scroll1_center.obj'
 
 OBJ_INPUT = f'{SEGMENT_ID}.obj'
 OBJ_SIMPLIFY = f'{SEGMENT_ID}_s{SIMPLIFY}.obj'
 OBJ_SIMPLIFY_LEFT = f'{SEGMENT_ID}_s{SIMPLIFY}_l.obj'
 OBJ_SIMPLIFY_RIGHT = f'{SEGMENT_ID}_s{SIMPLIFY}_r.obj'
 
+# simplify mesh
+print("simplify ...")
 simplify_obj(OBJ_INPUT, OBJ_SIMPLIFY, SIMPLIFY)
 
-crop_obj(OBJ_SIMPLIFY, X_MIDDLE, OBJ_SIMPLIFY_LEFT, OBJ_SIMPLIFY_RIGHT)
+# cut into half
+print("cutting ...")
+X_CENTER = parse_obj(CENTER_INPUT)['vertices']
+cut_obj(OBJ_SIMPLIFY, X_CENTER, OBJ_SIMPLIFY_LEFT, OBJ_SIMPLIFY_RIGHT)
 
+# divide into multiple pieces
+print("clustering ...")
 cluster_obj(OBJ_SIMPLIFY_LEFT, SEGMENT_ID, SIMPLIFY, REVERSE, True)
 cluster_obj(OBJ_SIMPLIFY_RIGHT, SEGMENT_ID, SIMPLIFY, REVERSE, False)
-
 
 
 

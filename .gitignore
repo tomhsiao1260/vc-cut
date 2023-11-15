@@ -1,5 +1,7 @@
 *.DS_Store
 *.obj
+!scroll1_center.obj
+
 
 env/
 __pycache__/
