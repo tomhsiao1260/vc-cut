@@ -1,5 +1,8 @@
 *.DS_Store
 *.obj
+*.tif
+*.png
+*.jpg
 !scroll1_center.obj
 
 
