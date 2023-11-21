@@ -227,15 +227,49 @@ def merge_obj(input_list, output_filename):
 
     save_obj(output_filename, merge_data)
 
+def get_clip(data):
+    vertices = data.get('vertices', np.array([]))
+
+    min_x = np.min(vertices[:, 0])
+    min_y = np.min(vertices[:, 1])
+    min_z = np.min(vertices[:, 2])
+    max_x = np.max(vertices[:, 0])
+    max_y = np.max(vertices[:, 1])
+    max_z = np.max(vertices[:, 2])
+
+    info = {}
+    info['clip'] = {}
+    info['clip']['x'] = int(min_x)
+    info['clip']['y'] = int(min_y)
+    info['clip']['z'] = int(min_z)
+    info['clip']['w'] = int(max_x - min_x)
+    info['clip']['h'] = int(max_y - min_y)
+    info['clip']['d'] = int(max_z - min_z)
+
+    print(info)
+
+# SEGMENT_ID = '20230702185753'
+# SEGMENT_ID = '20231005123335'
+# SEGMENT_ID = '20231012173610'
+# SEGMENT_ID = '20231012184420'
+# SEGMENT_ID = '20231012184421'
+# SEGMENT_ID = '20231016151000'
+# SEGMENT_ID = '20231022170900'
+# SEGMENT_ID = '20231024093300'
+# SEGMENT_ID = '20231031143852'
+SEGMENT_ID = '20231106155351'
+
 SIMPLIFY = 100
 REVERSE = False
-SEGMENT_ID = '20230702185753'
 CENTER_INPUT = 'scroll1_center.obj'
+OBJ_INPUT = f'../full-scrolls/Scroll1.volpkg/paths/{SEGMENT_ID}/{SEGMENT_ID}.obj'
 
-OBJ_INPUT = f'{SEGMENT_ID}.obj'
 OBJ_SIMPLIFY = f'{SEGMENT_ID}_s{SIMPLIFY}.obj'
 OBJ_SIMPLIFY_LEFT = f'{SEGMENT_ID}_s{SIMPLIFY}_l.obj'
 OBJ_SIMPLIFY_RIGHT = f'{SEGMENT_ID}_s{SIMPLIFY}_r.obj'
+
+# calcuate clip info
+get_clip(parse_obj(OBJ_INPUT))
 
 # simplify mesh
 print("simplify ...")
@@ -252,10 +286,11 @@ cluster_obj(OBJ_SIMPLIFY_LEFT, SEGMENT_ID, SIMPLIFY, REVERSE, True)
 cluster_obj(OBJ_SIMPLIFY_RIGHT, SEGMENT_ID, SIMPLIFY, REVERSE, False)
 
 # simplify image
-# simplify_image('20230702185753.tif', '20230702185753_s100.tif', 10)
+simplify_image(f'../full-scrolls/Scroll1.volpkg/paths/{SEGMENT_ID}/{SEGMENT_ID}.tif', f'{SEGMENT_ID}.tif', 20)
+simplify_image('full.png', f'{SEGMENT_ID}_inklabels.png', 10)
 
 # merge .obj files
-# input_list = ['20230702185753_s100_l1.obj', '20230702185753_s100_l4.obj']
+# input_list = ['20231005123335_s100_l4.obj', '20231005123335_s100_l5.obj']
 # merge_obj(input_list, 'merge.obj')
 
 

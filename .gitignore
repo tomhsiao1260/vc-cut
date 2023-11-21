@@ -3,6 +3,7 @@
 *.tif
 *.png
 *.jpg
+
 !scroll1_center.obj
 
 
